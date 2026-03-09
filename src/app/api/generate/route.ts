@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
-import OpenAI from "openai";
+import { GoogleGenerativeAI } from "@google/generative-ai";
 import { buildBriefPrompt } from "@/lib/prompt";
+import { generateDemoBrief } from "@/lib/demo-brief";
 import type { BriefFormData, GeneratedBrief } from "@/lib/types";
 
 function parseBriefResponse(text: string): GeneratedBrief {
@@ -21,13 +22,6 @@ function parseBriefResponse(text: string): GeneratedBrief {
 
 export async function POST(request: Request) {
   try {
-    if (!process.env.OPENAI_API_KEY) {
-      return NextResponse.json(
-        { error: "API key not configured" },
-        { status: 500 }
-      );
-    }
-
     const body = (await request.json()) as BriefFormData;
 
     const required = [
@@ -48,31 +42,32 @@ export async function POST(request: Request) {
       }
     }
 
+    const apiKey = process.env.GEMINI_API_KEY?.trim();
+
+    if (!apiKey) {
+      const brief = generateDemoBrief(body);
+      return NextResponse.json(brief);
+    }
+
     const prompt = buildBriefPrompt(body);
 
-    const openai = new OpenAI({
-      apiKey: process.env.OPENAI_API_KEY,
+    const genAI = new GoogleGenerativeAI(apiKey);
+    const model = genAI.getGenerativeModel({
+      model: "gemini-1.5-flash",
+      generationConfig: {
+        temperature: 0.7,
+        responseMimeType: "application/json",
+      },
     });
 
-    const completion = await openai.chat.completions.create({
-      model: "gpt-4o-mini",
-      messages: [
-        {
-          role: "system",
-          content:
-            "You return only valid JSON. No markdown, no explanation, no code blocks.",
-        },
-        { role: "user", content: prompt },
-      ],
-      temperature: 0.7,
-    });
+    const fullPrompt = `You return only valid JSON. No markdown, no explanation, no code blocks.\n\n${prompt}`;
+    const result = await model.generateContent(fullPrompt);
+    const response = result.response;
+    const content = response.text();
 
-    const content = completion.choices[0]?.message?.content;
     if (!content) {
-      return NextResponse.json(
-        { error: "No response from AI" },
-        { status: 500 }
-      );
+      const brief = generateDemoBrief(body);
+      return NextResponse.json(brief);
     }
 
     const brief = parseBriefResponse(content);
