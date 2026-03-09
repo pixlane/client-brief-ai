@@ -7,6 +7,8 @@ import {
   BUSINESS_TYPES,
   WEBSITE_TYPES,
   BUDGET_RANGES,
+  REQUIRED_BY_BACKEND,
+  REQUIRED_PER_STEP,
 } from "@/lib/constants";
 
 const INITIAL_DATA: BriefFormData = {
@@ -117,6 +119,7 @@ export function BriefForm({
 }) {
   const [step, setStep] = useState(0);
   const [data, setData] = useState<BriefFormData>(INITIAL_DATA);
+  const [validationError, setValidationError] = useState<string | null>(null);
 
   const currentStep = FORM_STEPS[step];
   const isLast = step === FORM_STEPS.length - 1;
@@ -124,29 +127,43 @@ export function BriefForm({
 
   const update = (key: keyof BriefFormData, value: string) => {
     setData((prev) => ({ ...prev, [key]: value }));
+    setValidationError(null);
   };
 
-  const validateStep = () => {
-    const required = ["businessName", "businessType", "websiteType", "targetAudience", "mainGoal"];
-    for (const f of fields) {
-      if (required.includes(f)) {
-        const v = data[f];
-        if (!v || String(v).trim() === "") return false;
-      }
+  const validateCurrentStep = (): boolean => {
+    const requiredForStep = REQUIRED_PER_STEP[step] ?? [];
+    for (const f of requiredForStep) {
+      const v = data[f as keyof BriefFormData];
+      if (!v || String(v).trim() === "") return false;
+    }
+    return true;
+  };
+
+  const validateAllRequired = (): boolean => {
+    for (const f of REQUIRED_BY_BACKEND) {
+      const v = data[f];
+      if (!v || String(v).trim() === "") return false;
     }
     return true;
   };
 
   const handleNext = () => {
-    if (!validateStep()) return;
     if (isLast) {
+      setValidationError(null);
+      if (!validateAllRequired()) {
+        setValidationError("Please complete all required fields from earlier steps.");
+        return;
+      }
       onSubmit(data);
     } else {
+      if (!validateCurrentStep()) return;
+      setValidationError(null);
       setStep((s) => s + 1);
     }
   };
 
   const handlePrev = () => {
+    setValidationError(null);
     if (step === 0) onBack();
     else setStep((s) => s - 1);
   };
@@ -270,9 +287,9 @@ export function BriefForm({
         )}
       </div>
 
-      {error && (
+      {(validationError || error) && (
         <div className="mt-6 rounded-lg bg-red-50 p-4 text-sm text-red-700 dark:bg-red-900/20 dark:text-red-400">
-          {error}
+          {validationError ?? error}
         </div>
       )}
 
