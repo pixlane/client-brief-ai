@@ -5,6 +5,21 @@ export const FORM_STEPS = [
   { id: 4, title: "Timeline & Budget", fields: ["budgetRange", "timeline", "extraNotes"] },
 ] as const;
 
+export const REQUIRED_BY_BACKEND = [
+  "businessName",
+  "businessType",
+  "websiteType",
+  "targetAudience",
+  "mainGoal",
+] as const;
+
+export const REQUIRED_PER_STEP: Record<number, readonly string[]> = {
+  0: ["businessName", "businessType", "websiteType"],
+  1: ["targetAudience", "mainGoal"],
+  2: [],
+  3: [],
+};
+
 export const BUSINESS_TYPES = [
   "Startup",
   "SMB",
